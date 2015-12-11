@@ -16,6 +16,9 @@ function (_, queryDef) {
 
     for (y = 0; y < target.metrics.length; y++) {
       metric = target.metrics[y];
+      if (metric.hide) {
+        continue;
+      }
 
       switch(metric.type) {
         case 'count': {
@@ -77,8 +80,12 @@ function (_, queryDef) {
           newSeries = { datapoints: [], metric: metric.type, field: metric.field, props: props};
           for (i = dropFirstLast; i < esAgg.buckets.length - dropFirstLast; i++) {
             bucket = esAgg.buckets[i];
-            value = bucket[metric.id].value;
-            newSeries.datapoints.push([value, bucket.key]);
+
+            value = bucket[metric.id];
+            if (value !== undefined) {
+              newSeries.datapoints.push([value.value, bucket.key]);
+            }
+
           }
           seriesList.push(newSeries);
           break;
@@ -194,7 +201,14 @@ function (_, queryDef) {
       });
     }
 
-    if (series.field) {
+    if (series.field && queryDef.isPipelineAgg(series.metric)) {
+      var appliedAgg = _.findWhere(target.metrics, { id: series.field });
+      if (appliedAgg) {
+        metricName += ' ' + queryDef.describeMetric(appliedAgg);
+      } else {
+        metricName = 'Unset';
+      }
+    } else if (series.field) {
       metricName += ' ' + series.field;
     }
 
